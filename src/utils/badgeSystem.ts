@@ -71,7 +71,7 @@ export const getTotalCompletedSteps = (progress?: Record<string, { completedStep
 export const checkForNewBadges = (
   user: any,
   toast: ReturnType<typeof useToast>['toast'],
-  login: ReturnType<typeof useUserStore>['login']
+  login: (user: any) => void
 ) => {
   if (!user) return;
 
