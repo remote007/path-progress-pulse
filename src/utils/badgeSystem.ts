@@ -70,10 +70,10 @@ export const getTotalCompletedSteps = (progress?: Record<string, { completedStep
 // Check if user is eligible for new badges
 export const checkForNewBadges = (
   user: any,
-  toast: ReturnType<typeof useToast>['toast'],
-  login: (user: any) => void
-) => {
-  if (!user) return;
+  toast?: ReturnType<typeof useToast>['toast'],
+  login?: (user: any) => void
+): Badge[] => {
+  if (!user) return [];
 
   const totalCompletedSteps = getTotalCompletedSteps(user.progress);
   const newBadges: Badge[] = [];
@@ -98,8 +98,8 @@ export const checkForNewBadges = (
     }
   });
   
-  // Award new badges to user
-  if (newBadges.length > 0) {
+  // Award new badges to user if login function is provided
+  if (newBadges.length > 0 && login) {
     const updatedBadges = [...(user.badges || []), ...newBadges.map(badge => badge.id)];
     
     login({
@@ -107,12 +107,16 @@ export const checkForNewBadges = (
       badges: updatedBadges
     });
     
-    // Show toast notification for each new badge
-    newBadges.forEach(badge => {
-      toast({
-        title: `New Badge: ${badge.name}`,
-        description: badge.description,
+    // Show toast notification for each new badge if toast function is provided
+    if (toast) {
+      newBadges.forEach(badge => {
+        toast({
+          title: `New Badge: ${badge.name}`,
+          description: badge.description,
+        });
       });
-    });
+    }
   }
+  
+  return newBadges;
 };

@@ -18,7 +18,10 @@ const RoadmapDetail = () => {
   
   const [roadmap, setRoadmap] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [userProgress, setUserProgress] = useState<any>({
+  const [userProgress, setUserProgress] = useState<{
+    completedSteps: string[];
+    inProgressSteps: string[];
+  }>({
     completedSteps: [],
     inProgressSteps: []
   });
@@ -54,14 +57,17 @@ const RoadmapDetail = () => {
     let newInProgressSteps = [...userProgress.inProgressSteps];
     
     if (status === 'inProgress') {
-      if (!newInProgressSteps.includes(stepId)) {
-        newInProgressSteps.push(stepId);
-      }
-      // Remove from completed if it was there
+      // For "in progress" status, we want to mark only this step as "in progress"
+      // and remove any other steps from the "in progress" list
+      newInProgressSteps = [stepId];
+      
+      // If the step is already completed, we should remove it from completed
       newCompletedSteps = newCompletedSteps.filter(id => id !== stepId);
-    } else {
+      
+    } else if (status === 'completed') {
       if (!newCompletedSteps.includes(stepId)) {
         newCompletedSteps.push(stepId);
+        
         // Award XP when completing a step (50 XP per step)
         const updatedUser = {
           ...user,
@@ -73,11 +79,9 @@ const RoadmapDetail = () => {
           title: 'Step completed!',
           description: 'You earned 50 XP!',
         });
-        
-        // Check for new badges
-        checkForNewBadges(updatedUser, toast, login);
       }
-      // Remove from inProgress if it was there
+      
+      // Remove this step from "in progress" list
       newInProgressSteps = newInProgressSteps.filter(id => id !== stepId);
     }
     
@@ -130,6 +134,16 @@ const RoadmapDetail = () => {
     return Math.round((completedSteps / totalSteps) * 100);
   };
   
+  // Check if a step should be locked based on previous steps completion
+  const isStepLocked = (index: number) => {
+    // First step is never locked
+    if (index === 0) return false;
+    
+    // Check if the previous step is completed
+    const prevStepId = roadmap.steps[index - 1].id;
+    return !userProgress.completedSteps.includes(prevStepId);
+  };
+  
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-14rem)]">
@@ -169,17 +183,33 @@ const RoadmapDetail = () => {
           <h2 className="text-2xl font-bold">Learning Path</h2>
           
           {roadmap.steps.map((step: any, index: number) => {
+            // Get status and locked state
             const status = getStepStatus(step.id);
+            const locked = isStepLocked(index);
             
             return (
-              <StepCard 
-                key={step.id} 
-                step={step} 
-                index={index}
-                roadmapId={roadmap.id}
-                status={status}
-                onStatusChange={markStepStatus}
-              />
+              <div key={step.id} className="relative">
+                {locked && (
+                  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+                    <div className="text-center p-6">
+                      <div className="text-4xl mb-2">🔒</div>
+                      <h3 className="text-lg font-medium">Step Locked</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Complete the previous steps to unlock this content.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <StepCard 
+                  key={step.id} 
+                  step={step} 
+                  index={index}
+                  roadmapId={roadmap.id}
+                  status={status}
+                  onStatusChange={markStepStatus}
+                  isLocked={locked}
+                />
+              </div>
             );
           })}
         </section>
