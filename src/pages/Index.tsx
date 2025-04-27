@@ -6,7 +6,12 @@ const Index = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    navigate('/');
+    // Use a small timeout to ensure router context is established
+    const timer = setTimeout(() => {
+      navigate('/');
+    }, 10);
+    
+    return () => clearTimeout(timer);
   }, [navigate]);
 
   return null;

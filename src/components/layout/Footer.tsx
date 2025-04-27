@@ -16,15 +16,15 @@ const Footer = () => {
           
           <div className="mt-8 md:mt-0">
             <div className="flex justify-center md:justify-end space-x-6">
-              <Link to="/about" className="text-muted-foreground hover:text-foreground">
+              <span className="text-muted-foreground hover:text-foreground cursor-pointer">
                 About
-              </Link>
-              <Link to="/contact" className="text-muted-foreground hover:text-foreground">
+              </span>
+              <span className="text-muted-foreground hover:text-foreground cursor-pointer">
                 Contact
-              </Link>
-              <Link to="/privacy" className="text-muted-foreground hover:text-foreground">
+              </span>
+              <span className="text-muted-foreground hover:text-foreground cursor-pointer">
                 Privacy
-              </Link>
+              </span>
             </div>
           </div>
         </div>

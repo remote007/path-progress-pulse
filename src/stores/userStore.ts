@@ -6,6 +6,15 @@ interface User {
   name: string;
   email: string;
   role: 'admin' | 'learner';
+  interests?: string[];
+  learningGoal?: string;
+  weeklyTime?: number;
+  progress?: Record<string, {
+    completedSteps: string[];
+    inProgressSteps: string[];
+  }>;
+  xp?: number;
+  badges?: string[];
 }
 
 interface UserState {
