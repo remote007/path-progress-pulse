@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { useUserStore } from '@/stores/userStore';
 
@@ -17,7 +18,8 @@ const Signup = () => {
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: 'learner'
   });
   
   const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +29,13 @@ const Signup = () => {
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }));
+  };
+  
+  const handleRoleChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      role: value as 'admin' | 'learner'
     }));
   };
   
@@ -51,7 +60,7 @@ const Signup = () => {
         id: `user${Date.now()}`,
         name: formData.name,
         email: formData.email,
-        role: 'learner' as const,
+        role: formData.role as 'admin' | 'learner',
         interests: [],
         weeklyTime: 0,
         progress: {},
@@ -66,8 +75,12 @@ const Signup = () => {
         description: 'Welcome to PathPulse! Set up your profile to get started.',
       });
       
-      // Navigate to profile setup
-      navigate('/profile-setup');
+      // Navigate based on role
+      if (formData.role === 'admin') {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/profile-setup');
+      }
       setIsLoading(false);
     }, 1000);
   };
@@ -132,6 +145,22 @@ const Signup = () => {
                 onChange={handleChange}
                 required
               />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="role">Account Type</Label>
+              <Select
+                value={formData.role}
+                onValueChange={handleRoleChange}
+              >
+                <SelectTrigger id="role">
+                  <SelectValue placeholder="Select account type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="learner">Learner</SelectItem>
+                  <SelectItem value="admin">Administrator</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
           

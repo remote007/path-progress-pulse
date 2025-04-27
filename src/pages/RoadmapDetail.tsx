@@ -1,15 +1,14 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Check, Play, FileText, HelpCircle, MessageSquare } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { roadmaps } from '@/data/mockData';
 import { useUserStore } from '@/stores/userStore';
+import StepCard from '@/components/roadmap/StepCard';
+import { checkForNewBadges } from '@/utils/badgeSystem';
 
 const RoadmapDetail = () => {
   const { id } = useParams();
@@ -49,6 +48,8 @@ const RoadmapDetail = () => {
   }, [id, user, navigate]);
   
   const markStepStatus = (stepId: string, status: 'inProgress' | 'completed') => {
+    if (!user) return;
+
     let newCompletedSteps = [...userProgress.completedSteps];
     let newInProgressSteps = [...userProgress.inProgressSteps];
     
@@ -61,9 +62,9 @@ const RoadmapDetail = () => {
     } else {
       if (!newCompletedSteps.includes(stepId)) {
         newCompletedSteps.push(stepId);
-        // Award XP when completing a step
+        // Award XP when completing a step (50 XP per step)
         const updatedUser = {
-          ...user!,
+          ...user,
           xp: (user?.xp || 0) + 50
         };
         login(updatedUser);
@@ -72,6 +73,9 @@ const RoadmapDetail = () => {
           title: 'Step completed!',
           description: 'You earned 50 XP!',
         });
+        
+        // Check for new badges
+        checkForNewBadges(updatedUser, toast, login);
       }
       // Remove from inProgress if it was there
       newInProgressSteps = newInProgressSteps.filter(id => id !== stepId);
@@ -93,10 +97,19 @@ const RoadmapDetail = () => {
         }
       };
       
-      login({
+      const updatedUser = {
         ...user,
         progress: updatedProgress
-      });
+      };
+      
+      login(updatedUser);
+      
+      // After updating progress, check if user earned any new badges
+      if (status === 'completed') {
+        setTimeout(() => {
+          checkForNewBadges(updatedUser, toast, login);
+        }, 300);
+      }
     }
   };
   
@@ -115,19 +128,6 @@ const RoadmapDetail = () => {
     const totalSteps = roadmap.steps.length;
     const completedSteps = userProgress.completedSteps.length;
     return Math.round((completedSteps / totalSteps) * 100);
-  };
-  
-  const ResourceIcon = ({ type }: { type: string }) => {
-    switch (type) {
-      case 'video':
-        return <Play className="h-4 w-4" />;
-      case 'blog':
-        return <FileText className="h-4 w-4" />;
-      case 'quiz':
-        return <HelpCircle className="h-4 w-4" />;
-      default:
-        return <FileText className="h-4 w-4" />;
-    }
   };
   
   if (loading) {
@@ -172,96 +172,14 @@ const RoadmapDetail = () => {
             const status = getStepStatus(step.id);
             
             return (
-              <Card key={step.id} className={status === 'completed' ? 'border-secondary' : ''}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle>
-                        {index + 1}. {step.title}
-                      </CardTitle>
-                      <CardDescription className="mt-1">
-                        {step.description}
-                      </CardDescription>
-                    </div>
-                    <div>
-                      {status === 'completed' && (
-                        <Badge className="bg-secondary">
-                          <Check className="h-4 w-4 mr-1" />
-                          Completed
-                        </Badge>
-                      )}
-                      {status === 'inProgress' && (
-                        <Badge variant="outline" className="border-primary text-primary">
-                          In Progress
-                        </Badge>
-                      )}
-                      {status === 'notStarted' && (
-                        <Badge variant="outline">Not Started</Badge>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Tabs defaultValue="resources">
-                    <TabsList>
-                      <TabsTrigger value="resources">Resources ({step.resources.length})</TabsTrigger>
-                      <TabsTrigger value="discussions">Discussions</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="resources" className="space-y-4 pt-4">
-                      {step.resources.map((resource: any) => (
-                        <div key={resource.id} className="flex items-start p-3 rounded-md border">
-                          <div className="mr-3 mt-1 p-1 rounded-full bg-muted">
-                            <ResourceIcon type={resource.type} />
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="font-medium">{resource.title}</h4>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {resource.description || "No description provided."}
-                            </p>
-                            <a 
-                              href={resource.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-primary hover:underline inline-flex items-center mt-2"
-                            >
-                              View {resource.type}
-                            </a>
-                          </div>
-                        </div>
-                      ))}
-                    </TabsContent>
-                    
-                    <TabsContent value="discussions" className="pt-4">
-                      <div className="text-center py-6">
-                        <MessageSquare className="h-10 w-10 mx-auto text-muted-foreground" />
-                        <h4 className="mt-2 font-medium">No discussions yet</h4>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Be the first to start a discussion about this topic.
-                        </p>
-                        <Button className="mt-4">Ask a Question</Button>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                  
-                  <div className="flex justify-end space-x-3 mt-6">
-                    {status !== 'inProgress' && (
-                      <Button 
-                        variant="outline" 
-                        onClick={() => markStepStatus(step.id, 'inProgress')}
-                      >
-                        Mark In Progress
-                      </Button>
-                    )}
-                    
-                    {status !== 'completed' && (
-                      <Button onClick={() => markStepStatus(step.id, 'completed')}>
-                        Mark as Completed
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+              <StepCard 
+                key={step.id} 
+                step={step} 
+                index={index}
+                roadmapId={roadmap.id}
+                status={status}
+                onStatusChange={markStepStatus}
+              />
             );
           })}
         </section>

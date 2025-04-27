@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import { roadmaps } from '@/data/mockData';
 import { useUserStore } from '@/stores/userStore';
 import { useNavigate } from 'react-router-dom';
+import { availableBadges } from '@/utils/badgeSystem';
 
 const LearnerDashboard = () => {
   const { user } = useUserStore();
   const navigate = useNavigate();
   const [userRoadmaps, setUserRoadmaps] = useState<any[]>([]);
+  const [userBadges, setUserBadges] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
@@ -43,6 +45,16 @@ const LearnerDashboard = () => {
       };
       
       setUserRoadmaps([userRoadmap]);
+      
+      // Get user badges
+      const earnedBadges = availableBadges
+        .filter(badge => user.badges?.includes(badge.id))
+        .map(badge => ({
+          ...badge,
+          earned: true
+        }));
+        
+      setUserBadges(earnedBadges);
       setLoading(false);
     }, 800);
   }, [user, navigate]);
@@ -106,6 +118,21 @@ const LearnerDashboard = () => {
             </CardContent>
           </Card>
         </section>
+        
+        {/* Badges section */}
+        {userBadges.length > 0 && (
+          <section className="space-y-4">
+            <h2 className="text-2xl font-bold">Your Badges</h2>
+            <div className="flex flex-wrap gap-3">
+              {userBadges.map(badge => (
+                <div key={badge.id} className="flex flex-col items-center bg-muted rounded-lg p-4 text-center w-28">
+                  <div className="text-4xl mb-2">{badge.image}</div>
+                  <div className="font-medium text-sm">{badge.name}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         
         {/* Active Roadmaps */}
         <section className="space-y-6">

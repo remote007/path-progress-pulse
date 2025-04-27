@@ -3,15 +3,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, Edit, Trash } from 'lucide-react';
+import { Plus, Edit, Trash, AlertOctagon } from 'lucide-react';
 import { roadmaps } from '@/data/mockData';
 import { useUserStore } from '@/stores/userStore';
+import ResourceForm from '@/components/admin/ResourceForm';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const AdminDashboard = () => {
   const { user } = useUserStore();
@@ -23,40 +23,44 @@ const AdminDashboard = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedRoadmap, setSelectedRoadmap] = useState<string | null>(null);
   const [selectedStep, setSelectedStep] = useState<string | null>(null);
-  
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    type: 'video',
-    url: ''
-  });
+  const [editingResource, setEditingResource] = useState<any>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [resourceToDelete, setResourceToDelete] = useState<any>(null);
   
   useEffect(() => {
+    // Check if user is admin
     if (!user || user.role !== 'admin') {
+      toast({
+        title: 'Access Denied',
+        description: 'You must be an administrator to access this page.',
+        variant: 'destructive',
+      });
       navigate('/login');
       return;
+    }
+    
+    // Load roadmaps from session storage or use default
+    const savedRoadmaps = sessionStorage.getItem('adminRoadmaps');
+    if (savedRoadmaps) {
+      try {
+        setAllRoadmaps(JSON.parse(savedRoadmaps));
+      } catch (err) {
+        console.error('Failed to parse roadmaps from session storage');
+      }
     }
     
     // Simulate loading
     setTimeout(() => {
       setLoading(false);
     }, 500);
-  }, [user, navigate]);
+  }, [user, navigate, toast]);
   
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-  
-  const handleTypeChange = (value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      type: value
-    }));
-  };
+  // Save roadmaps to session storage whenever they change
+  useEffect(() => {
+    if (!loading) {
+      sessionStorage.setItem('adminRoadmaps', JSON.stringify(allRoadmaps));
+    }
+  }, [allRoadmaps, loading]);
   
   const handleRoadmapChange = (value: string) => {
     setSelectedRoadmap(value);
@@ -68,6 +72,59 @@ const AdminDashboard = () => {
   };
   
   const handleAddResource = () => {
+    setEditingResource(null);
+    setDialogOpen(true);
+  };
+  
+  const handleEditResource = (roadmapId: string, stepId: string, resource: any) => {
+    setSelectedRoadmap(roadmapId);
+    setSelectedStep(stepId);
+    setEditingResource(resource);
+    setDialogOpen(true);
+  };
+  
+  const handleDeletePrompt = (roadmapId: string, stepId: string, resource: any) => {
+    setSelectedRoadmap(roadmapId);
+    setSelectedStep(stepId);
+    setResourceToDelete(resource);
+    setDeleteDialogOpen(true);
+  };
+  
+  const handleDeleteResource = () => {
+    if (!selectedRoadmap || !selectedStep || !resourceToDelete) {
+      return;
+    }
+    
+    // Update roadmaps by filtering out the resource
+    const updatedRoadmaps = allRoadmaps.map(roadmap => {
+      if (roadmap.id === selectedRoadmap) {
+        return {
+          ...roadmap,
+          steps: roadmap.steps.map(step => {
+            if (step.id === selectedStep) {
+              return {
+                ...step,
+                resources: step.resources.filter((resource: any) => resource.id !== resourceToDelete.id)
+              };
+            }
+            return step;
+          })
+        };
+      }
+      return roadmap;
+    });
+    
+    setAllRoadmaps(updatedRoadmaps);
+    setDeleteDialogOpen(false);
+    setResourceToDelete(null);
+    
+    toast({
+      title: 'Resource deleted',
+      description: 'The resource has been removed successfully.',
+    });
+  };
+  
+  const handleResourceSubmit = (resourceData: any) => {
     if (!selectedRoadmap || !selectedStep) {
       toast({
         title: 'Selection required',
@@ -77,33 +134,28 @@ const AdminDashboard = () => {
       return;
     }
     
-    // Validate form
-    if (!formData.title || !formData.url) {
-      toast({
-        title: 'Missing information',
-        description: 'Please fill in all required fields.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    // Create new resource
-    const newResource = {
-      id: `resource-${Date.now()}`,
-      ...formData
-    };
-    
-    // Update roadmaps (would save to API in a real app)
+    // Update roadmaps with the new or edited resource
     const updatedRoadmaps = allRoadmaps.map(roadmap => {
       if (roadmap.id === selectedRoadmap) {
         return {
           ...roadmap,
           steps: roadmap.steps.map(step => {
             if (step.id === selectedStep) {
-              return {
-                ...step,
-                resources: [...step.resources, newResource]
-              };
+              if (editingResource) {
+                // Edit existing resource
+                return {
+                  ...step,
+                  resources: step.resources.map((resource: any) => 
+                    resource.id === resourceData.id ? resourceData : resource
+                  )
+                };
+              } else {
+                // Add new resource
+                return {
+                  ...step,
+                  resources: [...step.resources, resourceData]
+                };
+              }
             }
             return step;
           })
@@ -115,17 +167,11 @@ const AdminDashboard = () => {
     setAllRoadmaps(updatedRoadmaps);
     setDialogOpen(false);
     
-    // Reset form
-    setFormData({
-      title: '',
-      description: '',
-      type: 'video',
-      url: ''
-    });
-    
     toast({
-      title: 'Resource added!',
-      description: 'The resource has been added successfully.',
+      title: editingResource ? 'Resource updated!' : 'Resource added!',
+      description: editingResource 
+        ? 'The resource has been updated successfully.' 
+        : 'The resource has been added successfully.',
     });
   };
   
@@ -149,7 +195,7 @@ const AdminDashboard = () => {
               Manage learning roadmaps and resources
             </p>
           </div>
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button onClick={handleAddResource}>
             <Plus className="mr-2 h-4 w-4" />
             Add Resource
           </Button>
@@ -171,21 +217,75 @@ const AdminDashboard = () => {
                     
                     <div>
                       <h3 className="font-medium mb-2">Steps:</h3>
-                      <ul className="space-y-2">
+                      <ul className="space-y-4">
                         {roadmap.steps.map(step => (
-                          <li key={step.id} className="bg-muted rounded-md p-3">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <h4 className="font-medium">{step.title}</h4>
-                                <p className="text-sm text-muted-foreground">{step.description}</p>
-                                <div className="mt-2">
-                                  <h5 className="text-sm font-medium">Resources: {step.resources.length}</h5>
-                                </div>
-                              </div>
-                              <div className="flex space-x-2">
-                                <Button size="sm" variant="outline">
-                                  <Edit className="h-4 w-4" />
-                                </Button>
+                          <li key={step.id} className="bg-muted rounded-md p-4">
+                            <div>
+                              <h4 className="font-medium">{step.title}</h4>
+                              <p className="text-sm text-muted-foreground">{step.description}</p>
+                              
+                              <div className="mt-4">
+                                <h5 className="text-sm font-medium mb-2">Resources: {step.resources.length}</h5>
+                                
+                                {step.resources.length > 0 ? (
+                                  <ul className="space-y-2">
+                                    {step.resources.map((resource: any) => (
+                                      <li key={resource.id} className="border rounded-md p-3 bg-background">
+                                        <div className="flex justify-between">
+                                          <div className="flex-1">
+                                            <div className="flex items-center">
+                                              <span className="font-medium">{resource.title}</span>
+                                              <span className="ml-2 text-xs bg-muted px-2 py-1 rounded">{resource.type}</span>
+                                            </div>
+                                            {resource.description && (
+                                              <p className="text-sm text-muted-foreground mt-1">{resource.description}</p>
+                                            )}
+                                            <a 
+                                              href={resource.url} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer"
+                                              className="text-xs text-primary hover:underline mt-1 inline-block"
+                                            >
+                                              {resource.url}
+                                            </a>
+                                          </div>
+                                          <div className="flex space-x-2">
+                                            <Button 
+                                              size="sm" 
+                                              variant="outline"
+                                              onClick={() => handleEditResource(roadmap.id, step.id, resource)}
+                                            >
+                                              <Edit className="h-4 w-4" />
+                                            </Button>
+                                            <Button 
+                                              size="sm" 
+                                              variant="destructive"
+                                              onClick={() => handleDeletePrompt(roadmap.id, step.id, resource)}
+                                            >
+                                              <Trash className="h-4 w-4" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <div className="text-center py-4 border rounded-md">
+                                    <p className="text-sm text-muted-foreground">No resources added yet</p>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      className="mt-2"
+                                      onClick={() => {
+                                        setSelectedRoadmap(roadmap.id);
+                                        setSelectedStep(step.id);
+                                        handleAddResource();
+                                      }}
+                                    >
+                                      Add First Resource
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </li>
@@ -200,115 +300,94 @@ const AdminDashboard = () => {
         </section>
       </div>
       
-      {/* Add Resource Dialog */}
+      {/* Add/Edit Resource Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
-            <DialogTitle>Add New Resource</DialogTitle>
+            <DialogTitle>{editingResource ? 'Edit Resource' : 'Add New Resource'}</DialogTitle>
             <DialogDescription>
-              Add a learning resource to a specific roadmap step.
+              {editingResource 
+                ? 'Update the details of this learning resource.' 
+                : 'Add a learning resource to a specific roadmap step.'
+              }
             </DialogDescription>
           </DialogHeader>
           
           <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="roadmap">Select Roadmap</Label>
-              <Select value={selectedRoadmap || ''} onValueChange={handleRoadmapChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a roadmap" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allRoadmaps.map(roadmap => (
-                    <SelectItem key={roadmap.id} value={roadmap.id}>
-                      {roadmap.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!editingResource && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="roadmap">Select Roadmap</Label>
+                  <Select value={selectedRoadmap || ''} onValueChange={handleRoadmapChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a roadmap" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allRoadmaps.map(roadmap => (
+                        <SelectItem key={roadmap.id} value={roadmap.id}>
+                          {roadmap.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="step">Select Step</Label>
+                  <Select 
+                    value={selectedStep || ''} 
+                    onValueChange={handleStepChange}
+                    disabled={!selectedRoadmap}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a step" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedRoadmap && allRoadmaps
+                        .find(r => r.id === selectedRoadmap)?.steps
+                        .map(step => (
+                          <SelectItem key={step.id} value={step.id}>
+                            {step.title}
+                          </SelectItem>
+                        ))
+                      }
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
             
-            <div className="space-y-2">
-              <Label htmlFor="step">Select Step</Label>
-              <Select 
-                value={selectedStep || ''} 
-                onValueChange={handleStepChange}
-                disabled={!selectedRoadmap}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a step" />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectedRoadmap && allRoadmaps
-                    .find(r => r.id === selectedRoadmap)?.steps
-                    .map(step => (
-                      <SelectItem key={step.id} value={step.id}>
-                        {step.title}
-                      </SelectItem>
-                    ))
-                  }
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="title">Resource Title</Label>
-              <Input
-                id="title"
-                name="title"
-                value={formData.title}
-                onChange={handleInputChange}
-                placeholder="Enter resource title"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                placeholder="Enter resource description"
-                rows={3}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="type">Resource Type</Label>
-              <Select value={formData.type} onValueChange={handleTypeChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select resource type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="video">Video</SelectItem>
-                  <SelectItem value="blog">Blog / Article</SelectItem>
-                  <SelectItem value="quiz">Quiz</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="url">URL</Label>
-              <Input
-                id="url"
-                name="url"
-                value={formData.url}
-                onChange={handleInputChange}
-                placeholder="Enter resource URL"
-              />
-            </div>
+            <ResourceForm 
+              roadmapId={selectedRoadmap} 
+              stepId={selectedStep} 
+              initialData={editingResource}
+              onSubmit={handleResourceSubmit}
+              onCancel={() => setDialogOpen(false)}
+            />
           </div>
-          
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleAddResource}>
-              Add Resource
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertOctagon className="h-5 w-5 text-destructive" />
+              Delete Resource
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this resource? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteResource} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
