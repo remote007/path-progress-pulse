@@ -31,12 +31,12 @@ const Landing = () => {
               </div>
               
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link to="/signup">
-                  <Button size="lg">Get Started</Button>
-                </Link>
-                <Link to="/login">
-                  <Button size="lg" variant="outline">Login</Button>
-                </Link>
+                <Button asChild size="lg">
+                  <Link to="/signup">Get Started</Link>
+                </Button>
+                <Button asChild size="lg" variant="outline">
+                  <Link to="/login">Login</Link>
+                </Button>
               </div>
               
               <div className="pt-4">
@@ -103,9 +103,9 @@ const Landing = () => {
           <p className="text-xl text-muted-foreground mb-8">
             Join thousands of learners already on their path to success.
           </p>
-          <Link to="/signup">
-            <Button size="lg">Create Your Free Account</Button>
-          </Link>
+          <Button asChild size="lg">
+            <Link to="/signup">Create Your Free Account</Link>
+          </Button>
         </div>
       </section>
     </div>
